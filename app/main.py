@@ -80,9 +80,6 @@ def register(
         return render("register.html", request=request, error="Username already exists")
 
 
-    pw_bytes = password.encode("utf-8")
-    if len(pw_bytes) > 72:
-        return render("register.html", request=request, error="Password is too long. Please use 72 bytes or fewer (try <= 50 characters, avoid emojis).")
 
     u = User(username=username, password_hash=hash_password(password))
 
@@ -105,11 +102,7 @@ def login(
     db: Session = Depends(get_db),
 ):
     u = db.execute(select(User).where(User.username == username.strip())).scalar_one_or_none()
-    pw_bytes = password.encode("utf-8")
-    if len(pw_bytes) > 72:
-        return render("login.html", request=request, error="Password too long. Please use the same shorter password you registered with.")
-    password = pw_bytes[:72].decode("utf-8", errors="ignore")
-
+    
     if not u or not verify_password(password, u.password_hash):
         return render("login.html", request=request, error="Invalid username or password")
 
@@ -147,13 +140,14 @@ def _start_generation_thread(gen_id: int, user_id: int):
         try:
             images = generate_images_multithreaded(tmp.name, breed)
 
-            for kind, url in images.items():
+            for kind, img_bytes in images.items():
                 db.add(ImageAsset(
                     generation_id=gen_id,
                     kind=kind,
-                    mime_type="text/plain",
-                    data=url.encode("utf-8"),
+                    mime_type="image/png",
+                    data=img_bytes,
                 ))
+
 
             gen.status = "done"
             gen.error_message = None
