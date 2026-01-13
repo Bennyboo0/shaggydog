@@ -1,6 +1,4 @@
 import threading
-from dotenv import load_dotenv
-load_dotenv()
 from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, HTTPException
@@ -20,15 +18,10 @@ from .services.shaggy import generate_images_multithreaded
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
 
-import os
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Shaggy Dog Web App")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=False)
-
-# Static assets only (Render Free has no persistent disk)
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
-
-Base.metadata.create_all(bind=engine)
 
 templates_dir = Path(__file__).parent / "templates"
 env = Environment(
@@ -36,10 +29,11 @@ env = Environment(
     autoescape=select_autoescape(["html", "xml"]),
 )
 
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+
 def render(template: str, **ctx) -> HTMLResponse:
     tpl = env.get_template(template)
     return HTMLResponse(tpl.render(**ctx))
-
 
 def get_current_user_id(request: Request) -> Optional[int]:
     return request.session.get("user_id")
@@ -82,6 +76,9 @@ def register(
         return render("register.html", request=request, error="Username already exists")
 
 
+    pw_bytes = password.encode("utf-8")
+    if len(pw_bytes) > 72:
+        return render("register.html", request=request, error="Password is too long. Please use 72 bytes or fewer (try <= 50 characters, avoid emojis).")
 
     u = User(username=username, password_hash=hash_password(password))
 
@@ -104,7 +101,11 @@ def login(
     db: Session = Depends(get_db),
 ):
     u = db.execute(select(User).where(User.username == username.strip())).scalar_one_or_none()
-    
+    pw_bytes = password.encode("utf-8")
+    if len(pw_bytes) > 72:
+        return render("login.html", request=request, error="Password too long. Please use the same shorter password you registered with.")
+    password = pw_bytes[:72].decode("utf-8", errors="ignore")
+
     if not u or not verify_password(password, u.password_hash):
         return render("login.html", request=request, error="Invalid username or password")
 
@@ -149,7 +150,6 @@ def _start_generation_thread(gen_id: int, user_id: int):
                     mime_type="image/png",
                     data=img_bytes,
                 ))
-
 
             gen.status = "done"
             gen.error_message = None
@@ -210,13 +210,7 @@ def generation_page(gen_id: int, request: Request, db: Session = Depends(get_db)
         select(ImageAsset).where(ImageAsset.generation_id == gen_id).order_by(ImageAsset.id)
     ).scalars().all()
 
-    by_kind = {}
-    for img in images:
-        if img.kind == "original":
-            by_kind["original"] = f"/image/{img.id}"   # original still served from DB
-        else:
-            by_kind[img.kind] = img.data.decode("utf-8")  # /media/...
-
+    by_kind = {img.kind: img.id for img in images}
     return render("generation.html", request=request, gen=gen, by_kind=by_kind)
 
 @app.get("/image/{image_id}")
