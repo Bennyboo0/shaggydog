@@ -5,6 +5,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config import IMAGE_MODEL
 from ..openai_client import edit_image_with_prompt, generate_image_from_prompt
 from PIL import Image, ImageDraw, ImageFilter
+import uuid
+
+MEDIA_DIR = os.environ.get("MEDIA_DIR", "/var/data/media")
+
+def save_png_bytes(img_bytes: bytes) -> str:
+    os.makedirs(MEDIA_DIR, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.png"
+    path = os.path.join(MEDIA_DIR, filename)
+    with open(path, "wb") as f:
+        f.write(img_bytes)
+    return filename
+
 
 def _make_face_mask(square_png_path: str) -> str:
     """
@@ -109,40 +121,38 @@ def generate_transition_prompts(breed: str) -> dict:
 
 
 
-
 def generate_images_multithreaded(
     original_path: str,
     breed: str,
     image_model: str = IMAGE_MODEL
 ) -> dict:
     """
-    Returns dict: {kind: image_bytes}
+    Returns dict: {kind: url_path}
 
-    Recommended behavior:
     - Transition 1: masked EDIT of the uploaded image
-    - Transition 2: masked EDIT of transition 1 (sequential progression)
+    - Transition 2: masked EDIT of transition 1 (sequential)
     - Dog: text-to-image GENERATE
 
-    Note: no multithreading, because transition2 depends on transition1.
+    Saves images to disk and returns URLs like /media/<id>.png
     """
     prompts = generate_transition_prompts(breed)
 
-    # DALL·E 2 edits require square PNG (<4MB). This helper already handles it.
+    # DALL·E 2 edits require square PNG (<4MB).
     base_path = _square_png_under_4mb(original_path)
 
-    # Make a face mask for the square image
+    # Mask for the square image
     mask_path = _make_face_mask(base_path)
 
-    out: dict[str, bytes] = {}
+    out: dict[str, str] = {}
 
-    # --- Transition 1: edit the base image ---
+    # --- Transition 1 ---
     t1_bytes = edit_image_with_prompt(
         base_path,
         prompts["t1"],
         model=image_model,
-        mask_path=mask_path,   # <-- key part
+        mask_path=mask_path,
     )
-    out["t1"] = t1_bytes
+    out["t1"] = save_png_bytes(t1_bytes)
 
     # Write t1 to a temp file so we can edit it for Transition 2
     t1_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -150,17 +160,17 @@ def generate_images_multithreaded(
     with open(t1_tmp.name, "wb") as f:
         f.write(t1_bytes)
 
-    # --- Transition 2: edit Transition 1 (sequential progression) ---
+    # --- Transition 2 ---
     t2_bytes = edit_image_with_prompt(
         t1_tmp.name,
         prompts["t2"],
         model=image_model,
-        mask_path=mask_path,   # same mask works because both are 1024x1024
+        mask_path=mask_path,
     )
-    out["t2"] = t2_bytes
+    out["t2"] = save_png_bytes(t2_bytes)
 
-    # --- Dog: generate from scratch (text-to-image) ---
+    # --- Dog ---
     dog_bytes = generate_image_from_prompt(prompts["dog"], model=image_model)
-    out["dog"] = dog_bytes
+    out["dog"] = save_png_bytes(dog_bytes)
 
     return out

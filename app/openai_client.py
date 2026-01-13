@@ -91,23 +91,19 @@ def edit_image_with_prompt(input_path: str, prompt: str, *, model: str, mask_pat
 
 def generate_image_from_prompt(prompt: str, *, model: str) -> bytes:
     """
-    Calls Images API 'generate' with a prompt.
-    Returns image bytes (downloaded from the returned URL).
+    Calls Images API generate with a prompt.
+    Returns PNG bytes.
     """
-    import httpx
-
+    import base64 as _b64
     client = get_client()
+
     result = client.images.generate(
         model=model,
         prompt=prompt,
         size="1024x1024",
-        # NOTE: no response_format here
+        response_format="b64_json",
     )
 
-    url = result.data[0].url
-    if not url:
-        raise RuntimeError("Images API did not return a URL.")
-    r = httpx.get(url, timeout=60.0)
-    r.raise_for_status()
-    return r.content
+    img_b64 = result.data[0].b64_json
+    return _b64.b64decode(img_b64)
 

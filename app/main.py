@@ -17,10 +17,19 @@ from .services.shaggy import generate_images_multithreaded
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
+import os
+
+MEDIA_DIR = os.environ.get("MEDIA_DIR", "/var/data/media")
+
+app = FastAPI(title="Shaggy Dog Web App")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=False)
+
+# Mount static/media AFTER app is created
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Shaggy Dog Web App")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=False)
 
 templates_dir = Path(__file__).parent / "templates"
@@ -143,12 +152,12 @@ def _start_generation_thread(gen_id: int, user_id: int):
         try:
             images = generate_images_multithreaded(tmp.name, breed)
 
-            for kind, img_bytes in images.items():
+            for kind, url in images.items():
                 db.add(ImageAsset(
                     generation_id=gen_id,
                     kind=kind,
-                    mime_type="image/png",
-                    data=img_bytes,
+                    mime_type="text/plain",
+                    data=url.encode("utf-8"),
                 ))
 
             gen.status = "done"
@@ -210,7 +219,13 @@ def generation_page(gen_id: int, request: Request, db: Session = Depends(get_db)
         select(ImageAsset).where(ImageAsset.generation_id == gen_id).order_by(ImageAsset.id)
     ).scalars().all()
 
-    by_kind = {img.kind: img.id for img in images}
+    by_kind = {}
+    for img in images:
+        if img.kind == "original":
+            by_kind["original"] = f"/image/{img.id}"   # original still served from DB
+        else:
+            by_kind[img.kind] = img.data.decode("utf-8")  # /media/...
+
     return render("generation.html", request=request, gen=gen, by_kind=by_kind)
 
 @app.get("/image/{image_id}")
