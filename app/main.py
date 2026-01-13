@@ -20,6 +20,7 @@ from pathlib import Path
 import os
 
 MEDIA_DIR = os.environ.get("MEDIA_DIR", "/var/data/media")
+os.makedirs(MEDIA_DIR, exist_ok=True)  # ✅ make sure it exists on Render
 
 app = FastAPI(title="Shaggy Dog Web App")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=False)
@@ -30,7 +31,6 @@ app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), na
 
 Base.metadata.create_all(bind=engine)
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=False)
 
 templates_dir = Path(__file__).parent / "templates"
 env = Environment(
