@@ -17,20 +17,16 @@ from .services.shaggy import generate_images_multithreaded
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
-import os
 
-MEDIA_DIR = os.environ.get("MEDIA_DIR", "/var/data/media")
-os.makedirs(MEDIA_DIR, exist_ok=True)  # ✅ make sure it exists on Render
+import os
 
 app = FastAPI(title="Shaggy Dog Web App")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, same_site="lax", https_only=False)
 
-# Mount static/media AFTER app is created
-app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+# Static assets only (Render Free has no persistent disk)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 Base.metadata.create_all(bind=engine)
-
 
 templates_dir = Path(__file__).parent / "templates"
 env = Environment(
@@ -38,11 +34,10 @@ env = Environment(
     autoescape=select_autoescape(["html", "xml"]),
 )
 
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
-
 def render(template: str, **ctx) -> HTMLResponse:
     tpl = env.get_template(template)
     return HTMLResponse(tpl.render(**ctx))
+
 
 def get_current_user_id(request: Request) -> Optional[int]:
     return request.session.get("user_id")
