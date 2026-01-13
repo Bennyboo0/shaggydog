@@ -57,7 +57,7 @@ def detect_breed_from_headshot(image_bytes: bytes) -> dict:
 def edit_image_with_prompt(input_path: str, prompt: str, *, model: str, mask_path: str | None = None) -> bytes:
     """
     Calls Images API 'edit' with a single image (+ optional mask) and prompt.
-    Returns image bytes (downloaded from returned URL).
+    Returns image bytes (downloaded from returned URL, or decoded from b64_json).
     """
     import httpx
 
@@ -81,18 +81,25 @@ def edit_image_with_prompt(input_path: str, prompt: str, *, model: str, mask_pat
                 size="1024x1024",
             )
 
-    url = result.data[0].url
-    if not url:
-        raise RuntimeError("Images API did not return a URL.")
-    r = httpx.get(url, timeout=60.0)
-    r.raise_for_status()
-    return r.content
+    data0 = result.data[0]
+
+    url = getattr(data0, "url", None)
+    if url:
+        r = httpx.get(url, timeout=60.0)
+        r.raise_for_status()
+        return r.content
+
+    b64 = getattr(data0, "b64_json", None)
+    if b64:
+        return base64.b64decode(b64)
+
+    raise RuntimeError("Images API returned neither url nor b64_json.")
 
 
 def generate_image_from_prompt(prompt: str, *, model: str) -> bytes:
     """
     Calls Images API 'generate' with a prompt.
-    Returns image bytes (downloaded from the returned URL).
+    Returns image bytes (downloaded from the returned URL, or decoded from b64_json).
     """
     import httpx
 
@@ -104,10 +111,16 @@ def generate_image_from_prompt(prompt: str, *, model: str) -> bytes:
         # NOTE: no response_format here
     )
 
-    url = result.data[0].url
-    if not url:
-        raise RuntimeError("Images API did not return a URL.")
-    r = httpx.get(url, timeout=60.0)
-    r.raise_for_status()
-    return r.content
+    data0 = result.data[0]
 
+    url = getattr(data0, "url", None)
+    if url:
+        r = httpx.get(url, timeout=60.0)
+        r.raise_for_status()
+        return r.content
+
+    b64 = getattr(data0, "b64_json", None)
+    if b64:
+        return base64.b64decode(b64)
+
+    raise RuntimeError("Images API returned neither url nor b64_json.")
