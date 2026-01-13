@@ -1,4 +1,6 @@
 import threading
+from dotenv import load_dotenv
+load_dotenv()
 from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, HTTPException
