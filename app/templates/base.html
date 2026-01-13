@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Shaggy Dog" }}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container row">
+        <a class="brand" href="/">Shaggy Dog</a>
+        <div class="spacer"></div>
+        {% if request.session.get("user_id") %}
+          <form method="post" action="/logout">
+            <button class="btn secondary" type="submit">Logout</button>
+          </form>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="container footer">
+      <small>© Shaggy Dog • MCO368 Final</small>
+    </footer>
+  </body>
+</html>

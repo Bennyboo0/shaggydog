@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Upload a headshot</h1>
+  <p class="muted">We’ll detect a resembling dog breed and generate 2 transition images + a final dog image (generated in parallel threads).</p>
+
+  <form method="post" action="/generate" enctype="multipart/form-data" class="card">
+    <input type="file" name="file" accept="image/*" required />
+    <button class="btn" type="submit">Make me a dog</button>
+  </form>
+
+  <h2>My recent generations</h2>
+  {% if generations|length == 0 %}
+    <p class="muted">None yet.</p>
+  {% else %}
+    <div class="list">
+      {% for g in generations %}
+        <a class="listitem" href="/generation/{{ g.id }}">
+          <div>
+            <div class="row">
+              <strong>#{{ g.id }}</strong>
+              <span class="pill {{ g.status }}">{{ g.status }}</span>
+            </div>
+            <div class="muted">
+              {% if g.breed %}Breed: {{ g.breed }} • {% endif %}
+              {{ g.created_at }}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

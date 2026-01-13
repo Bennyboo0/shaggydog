@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Login</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/login" class="card">
+    <label>Username</label>
+    <input name="username" autocomplete="username" required />
+    <label>Password</label>
+    <input name="password" type="password" autocomplete="current-password" required />
+    <button class="btn" type="submit">Login</button>
+    <p class="muted">No account? <a href="/register">Register</a></p>
+  </form>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Generation #{{ gen.id }}</h1>
+
+  <div class="row wrap">
+    <div class="card small">
+      <div class="row">
+        <strong>Status</strong>
+        <span class="spacer"></span>
+        <span class="pill {{ gen.status }}">{{ gen.status }}</span>
+      </div>
+      <div class="muted">
+        {% if gen.breed %}<div><strong>Breed:</strong> {{ gen.breed }}</div>{% endif %}
+        <div><strong>Created:</strong> {{ gen.created_at }}</div>
+      </div>
+
+      {% if gen.status == "error" %}
+        <p class="error">{{ gen.error_message }}</p>
+      {% endif %}
+    </div>
+
+    <div class="card grow">
+      <strong>Images</strong>
+      <p class="muted">This page will auto-refresh while images are generating.</p>
+
+      <div class="grid">
+        <div class="imgcard">
+          <div class="label">Original</div>
+          <img src="/image/{{ by_kind.get('original') }}" />
+        </div>
+
+        <div class="imgcard">
+          <div class="label">Transition 1</div>
+          {% if by_kind.get('t1') %}
+            <img src="/image/{{ by_kind.get('t1') }}" />
+          {% else %}
+            <div class="placeholder">Generating...</div>
+          {% endif %}
+        </div>
+
+        <div class="imgcard">
+          <div class="label">Transition 2</div>
+          {% if by_kind.get('t2') %}
+            <img src="/image/{{ by_kind.get('t2') }}" />
+          {% else %}
+            <div class="placeholder">Generating...</div>
+          {% endif %}
+        </div>
+
+        <div class="imgcard">
+          <div class="label">Dog</div>
+          {% if by_kind.get('dog') %}
+            <img src="/image/{{ by_kind.get('dog') }}" />
+          {% else %}
+            <div class="placeholder">Generating...</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const status = "{{ gen.status }}";
+      if (status === "processing") {
+        setTimeout(() => location.reload(), 3000);
+      }
+    })();
+  </script>
+{% endblock %}
